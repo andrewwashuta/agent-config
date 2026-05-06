@@ -27,4 +27,3 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
 export PATH="$HOME/.local/bin:$PATH"
-alias claude="~/.bun/install/global/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
