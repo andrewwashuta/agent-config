@@ -44,7 +44,7 @@ teardown_test_env() {
 # Create a fake skill with valid SKILL.md
 create_fake_skill() {
     local name="$1"
-    local location="${2:-$FAKE_REPO/skills}"
+    local location="${2:-$FAKE_REPO/.agents/skills}"
 
     mkdir -p "$location/$name"
     cat > "$location/$name/SKILL.md" << EOF
@@ -62,7 +62,7 @@ EOF
 # Create a fake skill with invalid SKILL.md (missing frontmatter)
 create_invalid_skill() {
     local name="$1"
-    local location="${2:-$FAKE_REPO/skills}"
+    local location="${2:-$FAKE_REPO/.agents/skills}"
 
     mkdir -p "$location/$name"
     cat > "$location/$name/SKILL.md" << EOF
@@ -75,7 +75,7 @@ EOF
 # Create a fake skill with missing SKILL.md
 create_skill_no_md() {
     local name="$1"
-    local location="${2:-$FAKE_REPO/skills}"
+    local location="${2:-$FAKE_REPO/.agents/skills}"
 
     mkdir -p "$location/$name"
     echo "Some content" > "$location/$name/README.md"

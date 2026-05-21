@@ -51,54 +51,24 @@ teardown() {
 }
 
 # =============================================================================
-# Add Skill Tests
+# Add Skill Tests (skills are managed by 'npx skills', not sync.sh)
 # =============================================================================
 
-@test "sync.sh add skill copies to repo and creates symlink" {
-    # Create a local skill
+@test "sync.sh add skill fails and points to npx skills" {
     create_fake_skill "my-skill" "$FAKE_HOME/.claude/skills"
-
-    run_sync add skill my-skill
-
-    # Should now be in repo
-    assert_dir "$FAKE_REPO/skills/my-skill"
-    [[ -f "$FAKE_REPO/skills/my-skill/SKILL.md" ]]
-
-    # Local should be symlink to repo
-    assert_symlink "$FAKE_HOME/.claude/skills/my-skill" "$FAKE_REPO/skills/my-skill"
-    assert_symlink "$FAKE_HOME/.codex/skills/my-skill" "$FAKE_REPO/skills/my-skill"
-}
-
-@test "sync.sh add skill creates backup" {
-    create_fake_skill "my-skill" "$FAKE_HOME/.claude/skills"
-    run_sync add skill my-skill
-    assert_backup_exists
-    assert_manifest_operation "add-skill"
-}
-
-@test "sync.sh add skill --dry-run doesn't modify" {
-    create_fake_skill "my-skill" "$FAKE_HOME/.claude/skills"
-    run run_sync --dry-run add skill my-skill
-
-    # Repo should not have the skill
-    [[ ! -d "$FAKE_REPO/skills/my-skill" ]]
-    # Local should still be a regular directory
-    assert_regular_file "$FAKE_HOME/.claude/skills/my-skill/SKILL.md"
-}
-
-@test "sync.sh add skill fails if already synced" {
-    create_fake_skill "my-skill"
-    run_install
 
     run run_sync add skill my-skill
     [[ "$status" -ne 0 ]]
-    [[ "$output" == *"already synced"* ]]
+    [[ "$output" == *"npx skills"* ]]
+
+    # Repo should not have the skill
+    [[ ! -d "$FAKE_REPO/.agents/skills/my-skill" ]]
 }
 
-@test "sync.sh add skill fails if skill doesn't exist" {
+@test "sync.sh add skill mentions 'npx skills add'" {
     run run_sync add skill nonexistent
     [[ "$status" -ne 0 ]]
-    [[ "$output" == *"not found"* ]]
+    [[ "$output" == *"npx skills add"* ]]
 }
 
 # =============================================================================
@@ -135,51 +105,25 @@ teardown() {
 }
 
 # =============================================================================
-# Remove Skill Tests
+# Remove Skill Tests (skills are managed by 'npx skills', not sync.sh)
 # =============================================================================
 
-@test "sync.sh remove skill removes from repo but keeps local" {
+@test "sync.sh remove skill fails and points to npx skills" {
     create_fake_skill "my-skill"
     run_install
 
-    # Verify it's synced
-    assert_symlink "$FAKE_HOME/.claude/skills/my-skill" "$FAKE_REPO/skills/my-skill"
-    assert_symlink "$FAKE_HOME/.codex/skills/my-skill" "$FAKE_REPO/skills/my-skill"
-
-    run_sync remove skill my-skill
-
-    # Should be removed from repo
-    [[ ! -d "$FAKE_REPO/skills/my-skill" ]]
-
-    # Should exist locally as regular directory
-    assert_dir "$FAKE_HOME/.claude/skills/my-skill"
-    assert_dir "$FAKE_HOME/.codex/skills/my-skill"
-    [[ ! -L "$FAKE_HOME/.claude/skills/my-skill" ]]
-    [[ ! -L "$FAKE_HOME/.codex/skills/my-skill" ]]
-}
-
-@test "sync.sh remove skill creates backup" {
-    create_fake_skill "my-skill"
-    run_install
-    run_sync remove skill my-skill
-    assert_backup_exists
-    assert_manifest_operation "remove-skill"
-}
-
-@test "sync.sh remove skill --dry-run doesn't modify" {
-    create_fake_skill "my-skill"
-    run_install
-
-    run run_sync --dry-run remove skill my-skill
+    run run_sync remove skill my-skill
+    [[ "$status" -ne 0 ]]
+    [[ "$output" == *"npx skills"* ]]
 
     # Repo should still have the skill
-    assert_dir "$FAKE_REPO/skills/my-skill"
+    assert_dir "$FAKE_REPO/.agents/skills/my-skill"
 }
 
-@test "sync.sh remove skill fails if not in repo" {
+@test "sync.sh remove skill mentions 'npx skills remove'" {
     run run_sync remove skill nonexistent
     [[ "$status" -ne 0 ]]
-    [[ "$output" == *"not in repo"* ]]
+    [[ "$output" == *"npx skills remove"* ]]
 }
 
 # =============================================================================
@@ -192,12 +136,12 @@ teardown() {
 }
 
 @test "sync.sh backups lists existing backups" {
-    create_fake_skill "my-skill" "$FAKE_HOME/.claude/skills"
-    run_sync add skill my-skill
+    create_fake_agent "my-agent" "$FAKE_HOME/.claude/agents"
+    run_sync add agent my-agent
 
     run run_sync backups
     [[ "$output" == *"Available Backups"* ]]
-    [[ "$output" == *"add-skill"* ]]
+    [[ "$output" == *"add-agent"* ]]
 }
 
 # =============================================================================
@@ -211,8 +155,8 @@ teardown() {
 }
 
 @test "sync.sh undo --dry-run shows what would be restored" {
-    create_fake_skill "my-skill" "$FAKE_HOME/.claude/skills"
-    run_sync add skill my-skill
+    create_fake_agent "my-agent" "$FAKE_HOME/.claude/agents"
+    run_sync add agent my-agent
 
     run run_sync --dry-run undo
     [[ "$output" == *"[dry-run]"* ]]
@@ -220,22 +164,22 @@ teardown() {
 }
 
 @test "sync.sh undo restores original files" {
-    # Create local skill with specific content
-    create_fake_skill "my-skill" "$FAKE_HOME/.claude/skills"
-    echo "original content" >> "$FAKE_HOME/.claude/skills/my-skill/SKILL.md"
+    # Create local agent with specific content
+    create_fake_agent "my-agent" "$FAKE_HOME/.claude/agents"
+    echo "original content" >> "$FAKE_HOME/.claude/agents/my-agent.md"
 
     # Add to repo (this backs up the original)
-    run_sync add skill my-skill
+    run_sync add agent my-agent
 
     # Verify it's now a symlink
-    assert_symlink "$FAKE_HOME/.claude/skills/my-skill" "$FAKE_REPO/skills/my-skill"
+    assert_symlink "$FAKE_HOME/.claude/agents/my-agent.md" "$FAKE_REPO/agents/my-agent.md"
 
     # Undo (with yes response)
     echo "y" | run_sync undo
 
-    # Should be restored as regular directory
-    [[ ! -L "$FAKE_HOME/.claude/skills/my-skill" ]]
-    assert_dir "$FAKE_HOME/.claude/skills/my-skill"
+    # Should be restored as regular file
+    [[ ! -L "$FAKE_HOME/.claude/agents/my-agent.md" ]]
+    assert_regular_file "$FAKE_HOME/.claude/agents/my-agent.md"
 }
 
 # =============================================================================
@@ -243,14 +187,14 @@ teardown() {
 # =============================================================================
 
 @test "sync.sh -n works as global dry-run flag" {
-    create_fake_skill "my-skill" "$FAKE_HOME/.claude/skills"
-    run run_sync -n add skill my-skill
+    create_fake_agent "my-agent" "$FAKE_HOME/.claude/agents"
+    run run_sync -n add agent my-agent
     [[ "$output" == *"[dry-run]"* ]]
-    [[ ! -d "$FAKE_REPO/skills/my-skill" ]]
+    [[ ! -f "$FAKE_REPO/agents/my-agent.md" ]]
 }
 
 @test "sync.sh --dry-run works anywhere in args" {
-    create_fake_skill "my-skill" "$FAKE_HOME/.claude/skills"
-    run run_sync add --dry-run skill my-skill
+    create_fake_agent "my-agent" "$FAKE_HOME/.claude/agents"
+    run run_sync add --dry-run agent my-agent
     [[ "$output" == *"[dry-run]"* ]]
 }

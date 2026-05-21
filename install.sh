@@ -126,7 +126,12 @@ handle_conflict() {
     echo "  [q] Quit"
 
     while true; do
-        read -p "Choice [r/l/d/q]: " choice
+        if ! read -rp "Choice [r/l/d/q]: " choice; then
+            echo ""
+            echo -e "${YELLOW}No input available (non-interactive run).${RESET}"
+            echo "Re-run with --force to use repo versions, or run in an interactive shell."
+            exit 1
+        fi
         case $choice in
             r|R)
                 backup_item "$dest" "$backup_path"
@@ -281,14 +286,14 @@ main() {
         done
     fi
 
-    # Skills (directory symlinks per skill)
-    if [ -d "$CONFIG_DIR/skills" ] && [ -n "$(ls -A "$CONFIG_DIR/skills" 2>/dev/null)" ]; then
+    # Skills (directory symlinks per skill; the skill store is managed by `npx skills`)
+    if [ -d "$CONFIG_DIR/.agents/skills" ] && [ -n "$(ls -A "$CONFIG_DIR/.agents/skills" 2>/dev/null)" ]; then
         if ! $DRY_RUN; then
             for target in "${skill_targets[@]}"; do
                 mkdir -p "$target"
             done
         fi
-        for skill in "$CONFIG_DIR/skills"/*/; do
+        for skill in "$CONFIG_DIR/.agents/skills"/*/; do
             [ -d "$skill" ] || continue
             skill_name=$(basename "$skill")
             for target in "${skill_targets[@]}"; do

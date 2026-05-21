@@ -56,8 +56,8 @@ teardown() {
 }
 
 @test "sync.sh validate fails for skill missing name" {
-    mkdir -p "$FAKE_REPO/skills/bad-skill"
-    cat > "$FAKE_REPO/skills/bad-skill/SKILL.md" << EOF
+    mkdir -p "$FAKE_REPO/.agents/skills/bad-skill"
+    cat > "$FAKE_REPO/.agents/skills/bad-skill/SKILL.md" << EOF
 ---
 description: Has description but no name
 ---
@@ -70,8 +70,8 @@ EOF
 }
 
 @test "sync.sh validate fails for skill missing description" {
-    mkdir -p "$FAKE_REPO/skills/bad-skill"
-    cat > "$FAKE_REPO/skills/bad-skill/SKILL.md" << EOF
+    mkdir -p "$FAKE_REPO/.agents/skills/bad-skill"
+    cat > "$FAKE_REPO/.agents/skills/bad-skill/SKILL.md" << EOF
 ---
 name: bad-skill
 ---
@@ -120,23 +120,21 @@ EOF
 }
 
 # =============================================================================
-# Validation on Add Tests
+# Add Skill is Delegated to 'npx skills'
 # =============================================================================
 
-@test "sync.sh add skill validates before adding" {
-    create_invalid_skill "bad-skill" "$FAKE_HOME/.claude/skills"
-
-    # Should warn about invalid skill (answer 'n' to the prompt)
-    run bash -c 'echo "n" | HOME="'"$FAKE_HOME"'" bash "'"$FAKE_REPO"'/sync.sh" --dry-run add skill bad-skill'
-    [[ "$output" == *"Missing frontmatter"* ]]
-}
-
-@test "sync.sh add skill with valid skill doesn't show warnings" {
+@test "sync.sh add skill is delegated to npx skills" {
     create_fake_skill "good-skill" "$FAKE_HOME/.claude/skills"
 
-    run run_sync --dry-run add skill good-skill
-    [[ "$output" != *"Missing"* ]]
-    [[ "$output" == *"[dry-run]"* ]]
+    run run_sync add skill good-skill
+    [[ "$status" -ne 0 ]]
+    [[ "$output" == *"npx skills"* ]]
+}
+
+@test "sync.sh add skill update guidance is shown" {
+    run run_sync add skill anything
+    [[ "$status" -ne 0 ]]
+    [[ "$output" == *"npx skills update"* ]]
 }
 
 # =============================================================================
@@ -144,8 +142,8 @@ EOF
 # =============================================================================
 
 @test "sync.sh validate handles empty SKILL.md" {
-    mkdir -p "$FAKE_REPO/skills/empty-skill"
-    touch "$FAKE_REPO/skills/empty-skill/SKILL.md"
+    mkdir -p "$FAKE_REPO/.agents/skills/empty-skill"
+    touch "$FAKE_REPO/.agents/skills/empty-skill/SKILL.md"
 
     run run_sync validate
     [[ "$status" -ne 0 ]]
@@ -153,8 +151,8 @@ EOF
 }
 
 @test "sync.sh validate fails for SKILL.md with only one frontmatter delimiter" {
-    mkdir -p "$FAKE_REPO/skills/bad-skill"
-    cat > "$FAKE_REPO/skills/bad-skill/SKILL.md" << EOF
+    mkdir -p "$FAKE_REPO/.agents/skills/bad-skill"
+    cat > "$FAKE_REPO/.agents/skills/bad-skill/SKILL.md" << EOF
 ---
 name: bad-skill
 description: Only one delimiter
@@ -168,8 +166,8 @@ EOF
 }
 
 @test "sync.sh validate passes skill with extra frontmatter fields" {
-    mkdir -p "$FAKE_REPO/skills/extra-skill"
-    cat > "$FAKE_REPO/skills/extra-skill/SKILL.md" << EOF
+    mkdir -p "$FAKE_REPO/.agents/skills/extra-skill"
+    cat > "$FAKE_REPO/.agents/skills/extra-skill/SKILL.md" << EOF
 ---
 name: extra-skill
 description: Has extra fields

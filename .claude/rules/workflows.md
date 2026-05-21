@@ -4,11 +4,13 @@
 
 ```bash
 git clone git@github.com:andrewwashuta/claude-config.git ~/claude-config
-cd ~/Developer/agent-config
+cd ~/claude-config
 ./install.sh
 ```
 
-Creates symlinks from `~/.claude/` to this repo. Local-only items are preserved.
+Creates symlinks from `~/.claude/` to this repo, including the skill store in
+`.agents/skills/` (which is committed, so skills come down with the clone).
+Local-only items are preserved.
 
 ### Dry-run mode
 
@@ -41,29 +43,35 @@ Shows status grouped by type (Skills, Agents, Rules):
 - `⚠` conflict (exists in both - run `./install.sh` to fix)
 - `→` external (symlinked elsewhere)
 
-## Adding items to sync across machines
+## Adding skills
+
+Skills are managed by [`npx skills`](https://skills.sh), not `sync.sh`:
 
 ```bash
-./sync.sh add skill <name>   # Add a skill directory
-./sync.sh add agent <name>   # Add an agent file (without .md extension)
-./sync.sh add rule <name>    # Add a rule file (without .md extension)
-./sync.sh push
+npx skills add <github-source>   # e.g. npx skills add pbakaus/impeccable
+npx skills update                # update tracked skills to latest
+npx skills remove <name>
 ```
 
-Copies the item to repo, replaces local with symlink, prompts for commit.
-
-Skills are validated before adding - must have SKILL.md with `name` and `description` in frontmatter.
-
-## Removing items from repo
+These write the skill store under `.agents/skills/`. Afterwards:
 
 ```bash
-./sync.sh remove skill <name>
+./install.sh        # refresh ~/.claude / ~/.codex symlinks
+./sync.sh push      # commit the updated store + skills-lock.json
+```
+
+## Adding / removing agents and rules
+
+```bash
+./sync.sh add agent <name>   # Add an agent file (without .md extension)
+./sync.sh add rule <name>    # Add a rule file (without .md extension)
 ./sync.sh remove agent <name>
 ./sync.sh remove rule <name>
 ./sync.sh push
 ```
 
-Removes from repo but keeps local copy.
+`add` copies the item to the repo and replaces the local file with a symlink;
+`remove` deletes it from the repo but keeps a local copy.
 
 ## Backups and undo
 
@@ -97,8 +105,8 @@ description: What this skill does
 Preview any command without making changes:
 
 ```bash
-./sync.sh --dry-run add skill my-skill
-./sync.sh -n remove agent my-agent
+./sync.sh --dry-run add agent my-agent
+./sync.sh -n remove rule my-rule
 ./install.sh --dry-run
 ```
 
@@ -112,7 +120,7 @@ Use this for work-specific or experimental items.
 
 ```
 ~/.claude/
-├── skills/          # Skill directories (each has SKILL.md)
+├── skills/          # Symlinks → claude-config/.agents/skills/* (managed by npx skills)
 ├── agents/          # Subagent markdown files
 ├── rules/           # Rule markdown files
 ├── settings.json
