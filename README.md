@@ -21,7 +21,7 @@ Reusable capabilities your coding agents can invoke, managed by [`npx skills`](h
 The skill store is committed to the repo at `.agents/skills/`; `install.sh` symlinks each skill
 into `~/.claude/skills/` and `~/.codex/skills/`.
 
-Run `npx skills list` to see everything installed. Four skills are tracked to an upstream
+Run `npx skills list` to see everything installed. Five skills are tracked to an upstream
 source and can be refreshed with `npx skills update`:
 
 | Skill | Source |
@@ -30,6 +30,7 @@ source and can be refreshed with `npx skills update`:
 | `transitions-dev` | `jakubantalik/transitions.dev` — production-ready CSS transitions |
 | `shadcn` | `shadcn/ui` — shadcn component workflows |
 | `recall` | `arjunkmrm/recall` — search past sessions |
+| `share-video` | `mainframecomputer/mainframe-plugins` — share short explainer videos via Mainframe |
 
 The remaining skills are local (no upstream repo) — they live in the store and travel with
 this repo. To give one update tracking later, re-add it: `npx skills add <github-source>`.

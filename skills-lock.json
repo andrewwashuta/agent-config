@@ -19,6 +19,12 @@
       "skillPath": "skills/shadcn/SKILL.md",
       "computedHash": "80a6226e78f6d1fe464214ae0ef449d49d8ffaa3e7704f011e9b418c678ad4d1"
     },
+    "share-video": {
+      "source": "mainframecomputer/mainframe-plugins",
+      "sourceType": "github",
+      "skillPath": "skills/share-video/SKILL.md",
+      "computedHash": "a83d07738d41f6ca77f140095f57b9b12635d48ae068c444404d7147b1132a23"
+    },
     "transitions-dev": {
       "source": "jakubantalik/transitions.dev",
       "sourceType": "github",
