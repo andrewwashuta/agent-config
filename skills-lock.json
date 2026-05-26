@@ -1,10 +1,35 @@
 {
   "version": 1,
   "skills": {
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": "skill/SKILL.md",
+      "computedHash": "34e59a34b9705187e87039faa5d9585aebe0056ef657f761b905afef276a3362"
+    },
+    "recall": {
+      "source": "arjunkmrm/recall",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "3804feaed009a67a5e5f0bb61feebfdc8150085a614b9307ce8c879cce4e78f3"
+    },
     "shadcn": {
       "source": "shadcn/ui",
       "sourceType": "github",
-      "computedHash": "91c02eb706f046fb9d6a061efbb96496e4be751b5b14c283cf82baaa50f3a985"
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "80a6226e78f6d1fe464214ae0ef449d49d8ffaa3e7704f011e9b418c678ad4d1"
+    },
+    "share-video": {
+      "source": "mainframecomputer/mainframe-plugins",
+      "sourceType": "github",
+      "skillPath": "skills/share-video/SKILL.md",
+      "computedHash": "a83d07738d41f6ca77f140095f57b9b12635d48ae068c444404d7147b1132a23"
+    },
+    "transitions-dev": {
+      "source": "jakubantalik/transitions.dev",
+      "sourceType": "github",
+      "skillPath": "skills/transitions-dev/SKILL.md",
+      "computedHash": "0ced212c5844b13010410e4d81627cc46d44ea5094d374aa9e0783de181a8822"
     }
   }
 }

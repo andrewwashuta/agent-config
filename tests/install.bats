@@ -36,8 +36,8 @@ teardown() {
 @test "install.sh symlinks skills" {
     create_fake_skill "test-skill"
     run_install
-    assert_symlink "$FAKE_HOME/.claude/skills/test-skill" "$FAKE_REPO/skills/test-skill"
-    assert_symlink "$FAKE_HOME/.codex/skills/test-skill" "$FAKE_REPO/skills/test-skill"
+    assert_symlink "$FAKE_HOME/.claude/skills/test-skill" "$FAKE_REPO/.agents/skills/test-skill"
+    assert_symlink "$FAKE_HOME/.codex/skills/test-skill" "$FAKE_REPO/.agents/skills/test-skill"
 }
 
 @test "install.sh symlinks multiple skills" {
@@ -45,12 +45,12 @@ teardown() {
     create_fake_skill "skill-two"
     create_fake_skill "skill-three"
     run_install
-    assert_symlink "$FAKE_HOME/.claude/skills/skill-one" "$FAKE_REPO/skills/skill-one"
-    assert_symlink "$FAKE_HOME/.claude/skills/skill-two" "$FAKE_REPO/skills/skill-two"
-    assert_symlink "$FAKE_HOME/.claude/skills/skill-three" "$FAKE_REPO/skills/skill-three"
-    assert_symlink "$FAKE_HOME/.codex/skills/skill-one" "$FAKE_REPO/skills/skill-one"
-    assert_symlink "$FAKE_HOME/.codex/skills/skill-two" "$FAKE_REPO/skills/skill-two"
-    assert_symlink "$FAKE_HOME/.codex/skills/skill-three" "$FAKE_REPO/skills/skill-three"
+    assert_symlink "$FAKE_HOME/.claude/skills/skill-one" "$FAKE_REPO/.agents/skills/skill-one"
+    assert_symlink "$FAKE_HOME/.claude/skills/skill-two" "$FAKE_REPO/.agents/skills/skill-two"
+    assert_symlink "$FAKE_HOME/.claude/skills/skill-three" "$FAKE_REPO/.agents/skills/skill-three"
+    assert_symlink "$FAKE_HOME/.codex/skills/skill-one" "$FAKE_REPO/.agents/skills/skill-one"
+    assert_symlink "$FAKE_HOME/.codex/skills/skill-two" "$FAKE_REPO/.agents/skills/skill-two"
+    assert_symlink "$FAKE_HOME/.codex/skills/skill-three" "$FAKE_REPO/.agents/skills/skill-three"
 }
 
 @test "install.sh symlinks agents" {
@@ -198,8 +198,8 @@ teardown() {
     run_install
 
     assert_symlink "$FAKE_HOME/.claude/settings.json" "$FAKE_REPO/settings.json"
-    assert_symlink "$FAKE_HOME/.claude/skills/test-skill" "$FAKE_REPO/skills/test-skill"
-    assert_symlink "$FAKE_HOME/.codex/skills/test-skill" "$FAKE_REPO/skills/test-skill"
+    assert_symlink "$FAKE_HOME/.claude/skills/test-skill" "$FAKE_REPO/.agents/skills/test-skill"
+    assert_symlink "$FAKE_HOME/.codex/skills/test-skill" "$FAKE_REPO/.agents/skills/test-skill"
 }
 
 @test "install.sh preserves local-only items" {

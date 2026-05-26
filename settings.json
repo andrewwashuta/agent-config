@@ -4,8 +4,10 @@
       "Bash(gh:*)",
       "Bash(git:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "auto"
   },
+  "model": "opus[1m]",
   "hooks": {
     "Stop": [
       {
@@ -24,6 +26,8 @@
     "command": "~/.claude/statusline.sh"
   },
   "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
-  "effortLevel": "high"
+  "theme": "dark",
+  "skipAutoPermissionPrompt": true
 }

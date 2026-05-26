@@ -6,7 +6,8 @@ BACKUP_DIR="$CONFIG_DIR/.backup"
 DRY_RUN=false
 CLAUDE_HOME="$HOME/.claude"
 CODEX_HOME="$HOME/.codex"
-SKILL_DIRS=("$CODEX_HOME/skills" "$CLAUDE_HOME/skills")
+# Skills are managed by `npx skills`; the repo skill store lives here.
+REPO_SKILLS="$CONFIG_DIR/.agents/skills"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -20,21 +21,6 @@ is_repo_symlink() {
     if [ -L "$path" ] && [[ "$(readlink "$path")" == "$CONFIG_DIR"* ]]; then
         return 0
     fi
-    return 1
-}
-
-find_skill_source() {
-    local name="$1"
-    local path=""
-
-    for dir in "${SKILL_DIRS[@]}"; do
-        path="$dir/$name"
-        if [ -d "$path" ] && ! is_repo_symlink "$path"; then
-            echo "$path"
-            return 0
-        fi
-    done
-
     return 1
 }
 
@@ -194,7 +180,7 @@ show_status() {
 
     echo -e "${BOLD}Skills (~/.claude):${RESET}"
     if [ -d "$CLAUDE_HOME/skills" ] && [ -n "$(ls -A "$CLAUDE_HOME/skills" 2>/dev/null)" ]; then
-        show_dir_status "$CLAUDE_HOME/skills" "$CONFIG_DIR/skills"
+        show_dir_status "$CLAUDE_HOME/skills" "$REPO_SKILLS"
     else
         echo "  (none)"
     fi
@@ -202,7 +188,7 @@ show_status() {
 
     echo -e "${BOLD}Skills (~/.codex):${RESET}"
     if [ -d "$CODEX_HOME/skills" ] && [ -n "$(ls -A "$CODEX_HOME/skills" 2>/dev/null)" ]; then
-        show_dir_status "$CODEX_HOME/skills" "$CONFIG_DIR/skills"
+        show_dir_status "$CODEX_HOME/skills" "$REPO_SKILLS"
     else
         echo "  (none)"
     fi
@@ -227,8 +213,8 @@ show_status() {
     echo "Legend: ✓ synced | ○ local only | ⚠ conflict | → external"
     echo ""
     echo "Usage:"
-    echo "  ./sync.sh add <type> <name>     Add a local item to repo"
-    echo "  ./sync.sh remove <type> <name>  Remove an item from repo (keeps local)"
+    echo "  ./sync.sh add <type> <name>     Add a local agent/rule to repo"
+    echo "  ./sync.sh remove <type> <name>  Remove an agent/rule from repo (keeps local)"
     echo "  ./sync.sh pull                  Pull latest and reinstall"
     echo "  ./sync.sh push                  Commit and push changes"
     echo "  ./sync.sh undo                  Restore from last backup"
@@ -238,90 +224,20 @@ show_status() {
     echo "Options:"
     echo "  -n, --dry-run                   Show what would be done"
     echo ""
-    echo "Types: skill, agent, rule"
+    echo "Types: agent, rule  (skills are managed by 'npx skills' — see README)"
 }
 
-add_skill() {
-    local name="$1"
-    local src
-    local dest="$CONFIG_DIR/skills/$name"
-    local skill_dir=""
-    local found_any=false
-    local all_synced=true
-
-    for skill_dir in "${SKILL_DIRS[@]}"; do
-        if [ -d "$skill_dir/$name" ]; then
-            found_any=true
-            if ! is_repo_symlink "$skill_dir/$name"; then
-                all_synced=false
-            fi
-        else
-            all_synced=false
-        fi
-    done
-
-    if ! $found_any; then
-        echo "Error: Skill '$name' not found in ~/.claude/skills or ~/.codex/skills"
-        exit 1
-    fi
-
-    if $all_synced; then
-        echo "Error: '$name' is already synced"
-        exit 1
-    fi
-
-    src="$(find_skill_source "$name")" || true
-    if [ -z "$src" ]; then
-        echo "Error: '$name' is already synced"
-        exit 1
-    fi
-
-    if [ -e "$dest" ]; then
-        echo "Error: Skill '$name' already exists in repo at $dest"
-        exit 1
-    fi
-
-    # Validate skill before adding
-    if ! validate_skill "$src"; then
-        echo ""
-        read -p "Add anyway? [y/N]: " confirm
-        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-            echo "Aborted."
-            exit 1
-        fi
-    fi
-
-    if $DRY_RUN; then
-        echo -e "${BLUE}[dry-run]${RESET} Would copy $src to $dest"
-        for skill_dir in "${SKILL_DIRS[@]}"; do
-            echo -e "${BLUE}[dry-run]${RESET} Would create symlink $skill_dir/$name -> $dest"
-        done
-        return
-    fi
-
-    echo "Adding skill '$name' to repo..."
-
-    # Create backup before modifying
-    local backup_path=$(create_backup)
-    backup_item "$src" "$backup_path"
-    write_manifest "$backup_path" "add-skill" "$name"
-
-    mkdir -p "$CONFIG_DIR/skills"
-    cp -r "$src" "$dest"
-
-    for skill_dir in "${SKILL_DIRS[@]}"; do
-        local target="$skill_dir/$name"
-        mkdir -p "$skill_dir"
-        if [ -e "$target" ] || [ -L "$target" ]; then
-            backup_item "$target" "$backup_path"
-            rm -rf "$target"
-        fi
-        ln -s "$dest" "$target"
-    done
-
-    echo -e "${GREEN}✓${RESET} Skill '$name' added and symlinked in ~/.claude and ~/.codex"
-    echo -e "${BLUE}Backup saved:${RESET} $backup_path"
-    echo "  Run: ./sync.sh push"
+# Skills are managed by `npx skills` — sync.sh no longer adds/removes them.
+skill_managed_by_npx() {
+    local action="$1"
+    echo "Skills are managed by 'npx skills', not sync.sh."
+    case "$action" in
+        add)    echo "  Add a skill:    npx skills add <github-source>" ;;
+        remove) echo "  Remove a skill: npx skills remove <name>" ;;
+    esac
+    echo "  Update skills:  npx skills update"
+    echo "  The repo skill store is $REPO_SKILLS (committed to git)."
+    exit 1
 }
 
 add_file() {
@@ -359,55 +275,6 @@ add_file() {
     ln -s "$dest" "$src"
 
     echo -e "${GREEN}✓${RESET} $(capitalize "${type%s}") '$name' added and symlinked"
-    echo -e "${BLUE}Backup saved:${RESET} $backup_path"
-    echo "  Run: ./sync.sh push"
-}
-
-remove_skill() {
-    local name="$1"
-    local dest="$CONFIG_DIR/skills/$name"
-
-    if [ ! -d "$dest" ]; then
-        echo "Error: Skill '$name' not in repo"
-        exit 1
-    fi
-
-    if $DRY_RUN; then
-        local skill_dir=""
-        for skill_dir in "${SKILL_DIRS[@]}"; do
-            echo -e "${BLUE}[dry-run]${RESET} Would remove symlink at $skill_dir/$name"
-            echo -e "${BLUE}[dry-run]${RESET} Would copy $dest to $skill_dir/$name"
-        done
-        echo -e "${BLUE}[dry-run]${RESET} Would delete $dest from repo"
-        return
-    fi
-
-    echo "Removing skill '$name' from repo..."
-
-    # Create backup
-    local backup_path=$(create_backup)
-    backup_item "$dest" "$backup_path"
-    local skill_dir=""
-    for skill_dir in "${SKILL_DIRS[@]}"; do
-        local target="$skill_dir/$name"
-        if [ -e "$target" ] || [ -L "$target" ]; then
-            backup_item "$target" "$backup_path"
-        fi
-    done
-    write_manifest "$backup_path" "remove-skill" "$name"
-
-    for skill_dir in "${SKILL_DIRS[@]}"; do
-        local target="$skill_dir/$name"
-        mkdir -p "$skill_dir"
-        if is_repo_symlink "$target"; then
-            rm "$target"
-            cp -r "$dest" "$target"
-        fi
-    done
-
-    rm -rf "$dest"
-
-    echo -e "${GREEN}✓${RESET} Skill '$name' removed from repo (kept local in ~/.claude and ~/.codex)"
     echo -e "${BLUE}Backup saved:${RESET} $backup_path"
     echo "  Run: ./sync.sh push"
 }
@@ -607,9 +474,9 @@ validate_all_skills() {
     local has_errors=false
     local checked=0
 
-    # Check repo skills
-    if [ -d "$CONFIG_DIR/skills" ]; then
-        for skill in "$CONFIG_DIR/skills"/*/; do
+    # Check repo skills (the npx-managed store)
+    if [ -d "$REPO_SKILLS" ]; then
+        for skill in "$REPO_SKILLS"/*/; do
             [ -d "$skill" ] || continue
             ((checked++)) || true
             if ! validate_skill "$skill"; then
@@ -669,7 +536,7 @@ case "${1:-}" in
         name="${3:-}"
         [ -z "$type" ] || [ -z "$name" ] && { echo "Usage: ./sync.sh add <type> <name>"; echo "Types: skill, agent, rule"; exit 1; }
         case "$type" in
-            skill)  add_skill "$name" ;;
+            skill)  skill_managed_by_npx add ;;
             agent)  add_file "agents" "$name" ;;
             rule)   add_file "rules" "$name" ;;
             *)      echo "Unknown type: $type (use: skill, agent, rule)"; exit 1 ;;
@@ -680,7 +547,7 @@ case "${1:-}" in
         name="${3:-}"
         [ -z "$type" ] || [ -z "$name" ] && { echo "Usage: ./sync.sh remove <type> <name>"; echo "Types: skill, agent, rule"; exit 1; }
         case "$type" in
-            skill)  remove_skill "$name" ;;
+            skill)  skill_managed_by_npx remove ;;
             agent)  remove_file "agents" "$name" ;;
             rule)   remove_file "rules" "$name" ;;
             *)      echo "Unknown type: $type (use: skill, agent, rule)"; exit 1 ;;
