@@ -27,3 +27,25 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
 export PATH="$HOME/.local/bin:$PATH"
+
+# --- conductor: per-workspace Storybook (added by Claude) ---
+# Launch Storybook on a stable port derived from the Conductor workspace name.
+# Same workspace -> same port every time; auto-bumps if the port is busy.
+# Usage: sb          (auto port)   |   sb 6200   (force a port)
+sb() {
+  local root web name port
+  root="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not in a git repo"; return 1; }
+  web="$root/web"; name="$(basename "$root")"
+  [ -d "$web" ] || { echo "no web/ dir at $web"; return 1; }
+  if [ -n "$1" ]; then
+    port="$1"                       # explicit arg wins
+  elif [ -n "$CONDUCTOR_PORT" ]; then
+    port="$CONDUCTOR_PORT"          # match Conductor's Run button when present
+  else
+    port=$(( 6010 + $(printf '%s' "$name" | cksum | cut -d' ' -f1) % 80 ))
+    while lsof -ti tcp:$port >/dev/null 2>&1; do port=$((port+1)); done
+  fi
+  echo "▶ Storybook [$name] → http://localhost:$port"
+  ( cd "$web" && bunx storybook dev -p "$port" --ci --quiet )
+}
+# --- end conductor Storybook ---
