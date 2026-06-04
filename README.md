@@ -1,12 +1,12 @@
-# claude-config
+# agent-config
 
 My agent configuration for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex, synced across machines via symlinks.
 
 ## Quick start
 
 ```bash
-git clone https://github.com/andrewwashuta/claude-config.git
-cd claude-config
+git clone https://github.com/andrewwashuta/agent-config.git
+cd agent-config
 ./install.sh
 ```
 
@@ -105,7 +105,7 @@ Tests run in isolated temp directories and don't affect your actual `~/.claude` 
 ## Directory structure
 
 ```
-claude-config/
+agent-config/
 ├── settings.json      # Claude Code settings
 ├── statusline.sh      # Optional statusline script
 ├── .agents/skills/    # Skill store (managed by npx skills)

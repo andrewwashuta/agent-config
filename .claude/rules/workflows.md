@@ -3,8 +3,8 @@
 ## Setting up on a new machine
 
 ```bash
-git clone git@github.com:andrewwashuta/claude-config.git ~/claude-config
-cd ~/claude-config
+git clone git@github.com:andrewwashuta/agent-config.git ~/agent-config
+cd ~/agent-config
 ./install.sh
 ```
 
@@ -120,7 +120,7 @@ Use this for work-specific or experimental items.
 
 ```
 ~/.claude/
-├── skills/          # Symlinks → claude-config/.agents/skills/* (managed by npx skills)
+├── skills/          # Symlinks → agent-config/.agents/skills/* (managed by npx skills)
 ├── agents/          # Subagent markdown files
 ├── rules/           # Rule markdown files
 ├── settings.json
