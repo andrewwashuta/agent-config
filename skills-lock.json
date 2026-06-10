@@ -7,6 +7,12 @@
       "skillPath": "skill/SKILL.md",
       "computedHash": "34e59a34b9705187e87039faa5d9585aebe0056ef657f761b905afef276a3362"
     },
+    "improve": {
+      "source": "shadcn/improve",
+      "sourceType": "github",
+      "skillPath": "skills/improve/SKILL.md",
+      "computedHash": "431adaf38132005b32cacb952313f18b4c03ee98ee4c5859bad323156a48bb02"
+    },
     "recall": {
       "source": "arjunkmrm/recall",
       "sourceType": "github",
