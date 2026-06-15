@@ -73,6 +73,29 @@ gh api "repos/$REPO/issues/$PR/comments" --paginate \
 ```
 Only treat a finding as actionable if it asks for a change — ignore overview prose and nits already marked resolved.
 
+### 1b. Keep the branch mergeable
+
+A PR isn't truly "ready" if it can't merge into base. Check this every pass:
+
+```bash
+gh pr view "$PR" --json mergeable,mergeStateStatus,baseRefName \
+  -q '"\(.mergeable)\t\(.mergeStateStatus)\t\(.baseRefName)"'
+```
+
+- **`CLEAN` / mergeable, up to date** → nothing to do, continue.
+- **`BEHIND`** (out of date with base, but no conflicts) → **auto-update, no need to ask.** It's mechanical and safe:
+  ```bash
+  gh pr update-branch "$PR"        # or: git fetch origin && git merge origin/<base> && git push
+  ```
+  Then re-run the repo's quick checks (lint/typecheck/tests) to confirm the update didn't break anything, and note it in your next re-tag comment.
+- **`CONFLICTING` / `DIRTY`** (real conflicts) → **do NOT resolve silently.** Resolving conflicts changes code semantics, so:
+  1. Merge base in locally (`git fetch origin && git merge origin/<base>`) and resolve the conflicts carefully, preferring the intent of both sides — never just take one side blindly.
+  2. Run the full test suite + typecheck.
+  3. **Show the user the resolution (the conflicted files and how you resolved each) and get an explicit OK before pushing.** Never push a conflict resolution unprompted.
+  4. If a conflict is genuinely ambiguous or needs a product call, stop and hand it to the user rather than guessing.
+
+Report mergeability in the final summary (step 5) either way.
+
 ### 2. Triage and implement
 
 For each actionable comment, decide **does this make sense?**
@@ -134,8 +157,8 @@ Exit `0` → responded, re-read state and continue. Exit `2` → give-up window 
 **Greptile is clear** → **stop** and report:
 - The PR link and that Greptile has signed off.
 - A short list of what you implemented and what you skipped (with reasons).
-- CI status (`gh pr checks "$PR"`).
-- An explicit: "Ready for your review and merge" — and wait. Never run `gh pr merge`.
+- CI status (`gh pr checks "$PR"`) and **merge status** (mergeable / behind / conflicting, per step 1b).
+- An explicit: "Ready for your review and merge" — and wait. Never run `gh pr merge`. (If conflicts remain unresolved because you're waiting on the user's OK, say so instead.)
 
 **Give-up window elapsed with no response** → **stop** (don't keep looping) and tell the user Greptile hasn't responded in `GIVE_UP_MINUTES`. If it has *never* responded on this PR, note Greptile may not be installed on this repo. Leave the PR as-is for the user.
 
@@ -161,5 +184,6 @@ In both cases tell the loop there's nothing left to do so it stops.
 - One PR per invocation; never touch other PRs or branches.
 - Never force-push or rewrite history; only add commits to the PR branch.
 - Never merge, close, or change PR base. The final merge is always the user's.
+- Auto-update a `BEHIND` branch (safe), but never push a conflict resolution without the user's explicit OK — resolving conflicts changes code semantics.
 - If a Greptile comment would require a large/risky change or a product decision, skip it and surface it to the user rather than guessing.
 - If `gh` isn't authed or the PR can't be found, stop and say so.
