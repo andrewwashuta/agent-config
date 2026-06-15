@@ -36,13 +36,17 @@ SINCE_EPOCH="$(since_epoch "$SINCE" || true)"
 give_up_epoch=$(( ${SINCE_EPOCH:-0} + GIVE_UP_MIN * 60 ))
 local_deadline=$(( $(date +%s) + LOCAL_CAP_SECONDS ))
 
-# Newest Greptile comment/review timestamp across inline comments, issue comments, and reviews.
+# Newest Greptile activity timestamp across inline comments, issue comments, and reviews.
+# IMPORTANT: Greptile re-reviews by EDITING its existing summary comment in place
+# (confidence 4/5 -> 5/5), which bumps `updated_at` but NOT `created_at`. So we key
+# off `updated_at` for comments (it's always >= created_at) to catch in-place updates;
+# reviews aren't edited that way, so we use `submitted_at`.
 latest_greptile_ts() {
   {
     gh api "repos/$REPO/pulls/$PR/comments" --paginate \
-      -q '.[] | select(.user.login | ascii_downcase | test("greptile")) | .created_at' 2>/dev/null || true
+      -q '.[] | select(.user.login | ascii_downcase | test("greptile")) | .updated_at' 2>/dev/null || true
     gh api "repos/$REPO/issues/$PR/comments" --paginate \
-      -q '.[] | select(.user.login | ascii_downcase | test("greptile")) | .created_at' 2>/dev/null || true
+      -q '.[] | select(.user.login | ascii_downcase | test("greptile")) | .updated_at' 2>/dev/null || true
     gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
       -q '.[] | select(.user.login | ascii_downcase | test("greptile")) | .submitted_at' 2>/dev/null || true
   } | sort | tail -1

@@ -56,12 +56,22 @@ gh api "repos/$REPO/issues/$PR/comments" --paginate
 gh api "repos/$REPO/pulls/$PR/reviews" --paginate
 ```
 
-Determine which state you're in:
-- **New feedback** — Greptile has actionable comments newer than your last push/reply → go to step 2.
-- **Waiting** — you already addressed + re-tagged, and Greptile hasn't replied since → go to step 4 (wait).
-- **Clear** — Greptile's latest review is an approval, or it explicitly says it has no further comments / all issues resolved → go to step 5 (done).
+**Greptile re-reviews by EDITING its summary comment in place** — it does NOT post a fresh comment each round. It keeps one summary comment (with a confidence score like `4/5` → `5/5` and a verdict like "safe to merge") and updates it. So:
+- Detect new activity by `updated_at`, **not** `created_at` — an in-place edit bumps `updated_at` while `created_at` stays put. Keying off `created_at` will miss the re-review entirely (this was a real bug).
+- The signal of "did Greptile respond to my re-tag?" is: the summary comment's `updated_at` is newer than your last re-tag, OR a new inline comment/review appeared after it.
+- The signal of "is it clear?" lives in the **body** of that latest summary comment — its confidence score and verdict, and whether any P0/P1/actionable findings remain. Read the body; don't infer from comment count.
 
-Use timestamps to decide "newer than": compare comment `created_at`/`updated_at` against the head commit's push time and your own last bot reply. Only treat a comment as actionable if it asks for a change — ignore Greptile's summary/overview comments and nits it already marked resolved.
+Determine which state you're in:
+- **New feedback** — the latest summary (or a new inline comment) lists actionable findings newer than your last push/reply → step 2.
+- **Waiting** — nothing from Greptile is newer than your last re-tag (`updated_at` unchanged) → step 4.
+- **Clear** — the latest summary's verdict is an approval / "safe to merge" with no remaining actionable findings, or a review state of APPROVED → step 5.
+
+To get the editable summary, read `updated_at` + `body` together, e.g.:
+```bash
+gh api "repos/$REPO/issues/$PR/comments" --paginate \
+  -q '.[] | select(.user.login|ascii_downcase|test("greptile")) | "\(.updated_at)\t\(.body)"' | tail -1
+```
+Only treat a finding as actionable if it asks for a change — ignore overview prose and nits already marked resolved.
 
 ### 2. Triage and implement
 
@@ -100,7 +110,7 @@ If you addressed everything and there's nothing to skip, drop the Skipped sectio
 
 ### 4. Check for Greptile's reply (with a give-up window)
 
-Greptile's latency varies — often a couple of minutes, sometimes ~15. You're waiting for a new comment/review from the Greptile author created **after** your re-tag.
+Greptile's latency varies — often a couple of minutes, sometimes ~15. You're waiting for Greptile activity newer than your re-tag — which is usually an **in-place edit to its existing summary comment** (`updated_at` advances, `created_at` does not), not a brand-new comment. The poller already keys off `updated_at` for this; if you check by hand, do the same.
 
 **Give-up is time-on-the-PR, not a local timer.** The threshold is measured from the `created_at` of your last `@greptileai` re-tag comment (or, on a brand-new PR, the PR's `createdAt`), default 20 min. This is stateless and resumable — it works the same across `/loop` ticks, a machine sleep, or a new session.
 
