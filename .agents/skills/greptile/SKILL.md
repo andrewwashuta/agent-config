@@ -72,10 +72,20 @@ Read feedback from **both** authors (match `greptile` and `chatgpt-codex-connect
 
 Codex (`chatgpt-codex-connector`) re-reviews **on push** (no `@` tag needed), so its latest comments after your last push are its current take.
 
-Determine which state you're in (**gated on Greptile** — Codex never blocks):
-- **New feedback** — Greptile's latest summary/inline lists actionable findings newer than your last push/reply, OR Codex has new findings worth acting on → step 2.
-- **Waiting** — nothing from Greptile is newer than your last re-tag (`updated_at` unchanged) → step 4.
-- **Clear** — Greptile's latest verdict is an approval / "safe to merge" with no remaining actionable findings (a review state of APPROVED counts). Any leftover *Codex-only* nits you deliberately skipped don't block this — list them in the report instead → step 5.
+**The loop runs in TWO PHASES to avoid reviewer churn.** Codex re-reviews on *every push*, so acting on Codex each round means every fix spawns fresh Codex nits and the loop never converges (this is the real-world failure: one Greptile review, but Codex re-reviewing 3+ times, each with new findings). The fix: converge Greptile first, then do a single Codex pass.
+
+Determine which **phase + state** you're in (**gated on Greptile** — Codex never blocks):
+
+**Phase A — converge Greptile (default).** Act on Greptile *only*; Codex is **read-only** here — collect its findings for later, but do NOT implement them and do NOT let them trigger a push.
+- **New Greptile feedback** — Greptile's latest summary/inline has actionable findings newer than your last push/reply → step 2 (Greptile items only).
+- **Waiting** — nothing from Greptile newer than your last re-tag (`updated_at` unchanged) → step 4.
+- **Greptile clear** — verdict is approval / "safe to merge" with no actionable findings (review state APPROVED counts) → advance to **Phase B**.
+- **Round cap** — if you've already done `MAX_ROUNDS` (default **4**) Greptile address→push cycles without reaching clear, stop and hand the rest to the user (step 5 give-up). Never loop forever.
+
+**Phase B — one Codex pass, then STOP.** Entered only once Greptile is clear:
+- Do exactly ONE pass implementing the *clearly-correct* Codex findings (skip the rest with reasons). Push once.
+- Re-tag Greptile once and wait once, to confirm the Codex-driven change didn't regress its verdict. Greptile still clear → step 5 (done). Greptile re-opens → at most ONE more Greptile round, then stop regardless.
+- **Never re-engage Codex after this push.** Its reaction to the Phase-B push is exactly the churn we're avoiding — surface any remaining Codex nits in the report for the user instead.
 
 To get the editable Greptile summary, read `updated_at` + `body` together, e.g.:
 ```bash
@@ -113,9 +123,9 @@ For each actionable comment, decide **does this make sense?**
 - **Implement** if it's a real correctness/clarity/security/consistency improvement that fits the codebase.
 - **Skip** if it's wrong, out of scope, a style choice that conflicts with the repo's conventions, or would make things worse. Skipping is fine and expected — but you must record a one-line reason.
 
-**Weight the two reviewers differently:**
-- **Greptile (primary):** the default bar above. Trust it; implement solid findings.
-- **Codex (advisory, grain of salt):** higher bar. Implement only when it's *clearly* correct and worth the change; lean toward skipping uncertain or stylistic Codex nits (with a reason). **When Codex and Greptile conflict, follow Greptile.** Never let a Codex finding override a deliberate choice Greptile was fine with.
+**Which reviewer you act on depends on the phase (see step 1):**
+- **Phase A — Greptile only.** Implement Greptile's solid findings; trust it. Codex findings are collected but NOT implemented yet (acting on them now is what causes the churn).
+- **Phase B — one Codex pass.** Higher bar: implement only *clearly-correct* Codex findings worth the change; skip uncertain/stylistic nits (with a reason). **When Codex and Greptile conflict, follow Greptile** — never let a Codex finding override a choice Greptile was fine with.
 
 Make the edits. Keep changes tight and matched to the surrounding code (see the `deslop` / `simplify` conventions). Run the repo's lint/typecheck/tests if they're quick and relevant before pushing.
 
@@ -181,9 +191,15 @@ Exit `0` → responded, re-read state and continue. Exit `2` → give-up window 
 
 Either way, end the pass cleanly — under `/loop`, signal there's nothing left to do so the loop stops.
 
+**Terminal-state signal (for the Codex wrapper).** Whenever you reach a terminal state — Greptile clear / ready-to-merge, give-up, or the `MAX_ROUNDS` cap — and the env var `GREPTILE_DONE_FILE` is set, touch it so an external loop can exit early:
+```bash
+[ -n "${GREPTILE_DONE_FILE:-}" ] && : > "$GREPTILE_DONE_FILE"
+```
+Only touch it on a *terminal* state — never when you're still mid-convergence or waiting.
+
 ## Continuous mode
 
-The skill works in both **Claude Code** and **Codex** (symlinked into `~/.claude/skills` and `~/.codex/skills`). The single pass is identical in both — only the way you *keep* listening differs.
+The skill works in both **Claude Code** and **Codex** (symlinked into `~/.claude/skills` and `~/.codex/skills`). The single pass is identical in both; only the way you *keep* listening differs. **Convergence is governed by the two-phase model in step 1** — that's what keeps the loop from churning, regardless of which agent drives the ticks.
 
 **Claude Code** — use the built-in loop:
 ```
@@ -192,14 +208,16 @@ The skill works in both **Claude Code** and **Codex** (symlinked into `~/.claude
 ```
 Each tick re-runs the pass (instantaneous check per tick — see step 4).
 
-**Codex** (no `/loop`) — either run a single `/greptile` pass that blocks on the poller, or wrap repeated passes in an external loop / cron:
+**Codex** (no `/loop`) — use the bundled wrapper, which is the `/loop /greptile` equivalent: bounded rounds, paced, with early-exit when the skill signals done:
 ```bash
-while :; do codex exec "/greptile 123"; sleep 180; done
+bash ~/.codex/skills/greptile/scripts/greptile-loop.sh 123          # PR 123, defaults (4 rounds, 180s apart)
+bash ~/.codex/skills/greptile/scripts/greptile-loop.sh 123 6 120     # 6 rounds, 120s apart
 ```
+(Plain fallback if you don't want the wrapper: `while :; do codex exec "/greptile 123"; sleep 180; done` — but you lose the round cap and early-exit.)
 
-Either way it converges, because the pass is **idempotent** and the give-up window is **derived from PR timestamps** (not local state) — so it implements new feedback as it arrives, re-tags, and reaches the same end state whether ticks come from `/loop`, an external loop, or you re-running it by hand. Stop when:
-- Greptile is clear → reported "ready for merge", or
-- the give-up window elapsed with no Greptile response.
+It converges because: (1) the **two-phase model** stops Codex from re-opening the loop, (2) the pass is **idempotent** with a give-up window **derived from PR timestamps** (not local state), and (3) the **`MAX_ROUNDS` cap** (default 4) is a hard backstop. The end state is the same whether ticks come from `/loop`, the wrapper, or you re-running by hand. Stop when:
+- Greptile is clear → one Codex pass → "ready for merge", or
+- the give-up window elapsed, or the round cap was hit.
 
 ## Guardrails
 
