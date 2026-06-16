@@ -1,6 +1,8 @@
 # greptile skill
 
-Auto-tend a PR's [Greptile](https://greptile.com) review: create the PR if needed, implement the feedback that makes sense (skip the rest with a reason), push, re-tag `@greptileai`, wait for the re-review, and stop with a merge recommendation once it's clear. **It never merges — that's always yours.**
+Auto-tend a PR's automated code review: create the PR if needed, implement the feedback that makes sense (skip the rest with a reason), push, re-tag `@greptileai`, wait for the re-review, keep the branch mergeable, and stop with a merge recommendation once it's clear. **It never merges — that's always yours.**
+
+Reads **two** reviewers: [Greptile](https://greptile.com) (primary — gates merge-readiness, gets re-tagged) and Codex / `chatgpt-codex-connector` (secondary, advisory — taken with a grain of salt, never blocks).
 
 ## Install
 

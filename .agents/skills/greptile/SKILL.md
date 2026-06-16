@@ -1,17 +1,24 @@
 ---
 name: greptile
-description: Tend a PR's Greptile code review end-to-end — create the PR if the current branch doesn't have one yet, then fetch @greptileai's feedback, implement the changes that make sense (skip the rest with a reason), push, re-tag @greptileai for a re-review, wait for its reply, and stop with a merge recommendation once it's all clear. Stops before merging — you do the final merge. Use when asked to "open a PR and handle greptile", "address Greptile", "handle greptile feedback", "respond to the bot review", or to keep listening on a PR. Pair with /loop to keep tending continuously.
+description: Tend a PR's automated code review end-to-end — create the PR if the current branch doesn't have one yet, then fetch Greptile's (primary) and Codex's (secondary) feedback, implement the changes that make sense (skip the rest with a reason), push, re-tag @greptileai for a re-review, wait for its reply, and stop with a merge recommendation once it's all clear. Stops before merging — you do the final merge. Use when asked to "open a PR and handle greptile", "address Greptile", "handle the bot review", "respond to Codex", or to keep listening on a PR. Pair with /loop to keep tending continuously.
 ---
 
-# Tend Greptile feedback on a PR
+# Tend automated PR review feedback (Greptile + Codex)
 
-Drive one PR's Greptile review to a clean state. **You do not merge** — you stop once Greptile is happy and hand the merge back to the user.
+Drive one PR's automated code review to a clean state. **You do not merge** — you stop once the review is happy and hand the merge back to the user.
+
+Two reviewers, weighted differently:
+- **Greptile — primary.** Its verdict gates "ready to merge", and `@greptileai` is what you re-tag for a re-review.
+- **Codex (`chatgpt-codex-connector`) — secondary / advisory.** Read it, but take it with a grain of salt: it's less reliable than Greptile. Apply a higher bar (see step 2), don't gate merge-readiness on it, and don't loop waiting for it.
 
 ## Scope
 
-- Works on **one PR at a time**, in whatever repo is the current working directory. Repo-agnostic — use it in any repo where Greptile is enabled.
+- Works on **one PR at a time**, in whatever repo is the current working directory. Repo-agnostic — use it in any repo where Greptile and/or Codex review.
 - Target PR: the argument if given (`/greptile 123` or a PR URL), otherwise the PR for the current branch — **and if the current branch has no PR yet, create one first** (step 0).
-- Greptile's bot posts as an author whose login contains `greptile` (e.g. `greptile-apps[bot]`). Match case-insensitively — never hard-code one login. If no Greptile author ever appears on the PR (after the give-up window in step 4), assume Greptile isn't installed on this repo and tell the user.
+- Reviewer authors, matched case-insensitively (never hard-code one exact login):
+  - **Greptile** — login contains `greptile` (e.g. `greptile-apps[bot]`).
+  - **Codex** — login contains `chatgpt-codex-connector` (or `codex`).
+- If no Greptile author ever appears (after the give-up window in step 4), assume Greptile isn't installed on this repo and tell the user. Codex may or may not be present — its absence is fine.
 
 ## Step 0 — ensure a PR exists
 
@@ -50,23 +57,27 @@ Each invocation does exactly one pass (after step 0 ensures a PR exists). The pa
 ```bash
 PR=<number>           # resolved above
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-# Review comments (inline) + issue comments + reviews from Greptile:
+# Inline comments + issue comments + reviews (from BOTH reviewers):
 gh api "repos/$REPO/pulls/$PR/comments" --paginate
 gh api "repos/$REPO/issues/$PR/comments" --paginate
 gh api "repos/$REPO/pulls/$PR/reviews" --paginate
 ```
+
+Read feedback from **both** authors (match `greptile` and `chatgpt-codex-connector`/`codex`, case-insensitively), but keep them tagged by source — Greptile is primary, Codex is advisory (step 2 weights them).
 
 **Greptile re-reviews by EDITING its summary comment in place** — it does NOT post a fresh comment each round. It keeps one summary comment (with a confidence score like `4/5` → `5/5` and a verdict like "safe to merge") and updates it. So:
 - Detect new activity by `updated_at`, **not** `created_at` — an in-place edit bumps `updated_at` while `created_at` stays put. Keying off `created_at` will miss the re-review entirely (this was a real bug).
 - The signal of "did Greptile respond to my re-tag?" is: the summary comment's `updated_at` is newer than your last re-tag, OR a new inline comment/review appeared after it.
 - The signal of "is it clear?" lives in the **body** of that latest summary comment — its confidence score and verdict, and whether any P0/P1/actionable findings remain. Read the body; don't infer from comment count.
 
-Determine which state you're in:
-- **New feedback** — the latest summary (or a new inline comment) lists actionable findings newer than your last push/reply → step 2.
-- **Waiting** — nothing from Greptile is newer than your last re-tag (`updated_at` unchanged) → step 4.
-- **Clear** — the latest summary's verdict is an approval / "safe to merge" with no remaining actionable findings, or a review state of APPROVED → step 5.
+Codex (`chatgpt-codex-connector`) re-reviews **on push** (no `@` tag needed), so its latest comments after your last push are its current take.
 
-To get the editable summary, read `updated_at` + `body` together, e.g.:
+Determine which state you're in (**gated on Greptile** — Codex never blocks):
+- **New feedback** — Greptile's latest summary/inline lists actionable findings newer than your last push/reply, OR Codex has new findings worth acting on → step 2.
+- **Waiting** — nothing from Greptile is newer than your last re-tag (`updated_at` unchanged) → step 4.
+- **Clear** — Greptile's latest verdict is an approval / "safe to merge" with no remaining actionable findings (a review state of APPROVED counts). Any leftover *Codex-only* nits you deliberately skipped don't block this — list them in the report instead → step 5.
+
+To get the editable Greptile summary, read `updated_at` + `body` together, e.g.:
 ```bash
 gh api "repos/$REPO/issues/$PR/comments" --paginate \
   -q '.[] | select(.user.login|ascii_downcase|test("greptile")) | "\(.updated_at)\t\(.body)"' | tail -1
@@ -102,21 +113,25 @@ For each actionable comment, decide **does this make sense?**
 - **Implement** if it's a real correctness/clarity/security/consistency improvement that fits the codebase.
 - **Skip** if it's wrong, out of scope, a style choice that conflicts with the repo's conventions, or would make things worse. Skipping is fine and expected — but you must record a one-line reason.
 
+**Weight the two reviewers differently:**
+- **Greptile (primary):** the default bar above. Trust it; implement solid findings.
+- **Codex (advisory, grain of salt):** higher bar. Implement only when it's *clearly* correct and worth the change; lean toward skipping uncertain or stylistic Codex nits (with a reason). **When Codex and Greptile conflict, follow Greptile.** Never let a Codex finding override a deliberate choice Greptile was fine with.
+
 Make the edits. Keep changes tight and matched to the surrounding code (see the `deslop` / `simplify` conventions). Run the repo's lint/typecheck/tests if they're quick and relevant before pushing.
 
 ### 3. Commit, push, and re-tag
 
 ```bash
 git add -A
-git commit -m "Address Greptile review feedback"   # end with the standard Co-Authored-By trailer
+git commit -m "Address review feedback"   # end with the standard Co-Authored-By trailer
 git push
 ```
 
-Then post one PR comment that re-triggers a re-review and records your decisions:
+The push alone re-triggers **Codex**. To re-trigger **Greptile**, post one PR comment that tags it and records your decisions (attribute the source when it clarifies, e.g. `(Greptile)` / `(Codex)`):
 
 ```bash
 gh pr comment "$PR" --body "$(cat <<'EOF'
-@greptileai I've pushed changes addressing your review.
+@greptileai I've pushed changes addressing the review.
 
 **Addressed**
 - <comment> → <what changed>
@@ -129,7 +144,7 @@ EOF
 )"
 ```
 
-If you addressed everything and there's nothing to skip, drop the Skipped section. Tagging `@greptileai` is what triggers the re-review — don't forget it.
+If you addressed everything and there's nothing to skip, drop the Skipped section. Tagging `@greptileai` is what triggers Greptile's re-review — don't forget it. (Codex doesn't need a tag; it re-reviews from the push.)
 
 ### 4. Check for Greptile's reply (with a give-up window)
 
@@ -156,7 +171,8 @@ Exit `0` → responded, re-read state and continue. Exit `2` → give-up window 
 
 **Greptile is clear** → **stop** and report:
 - The PR link and that Greptile has signed off.
-- A short list of what you implemented and what you skipped (with reasons).
+- A short list of what you implemented and what you skipped (with reasons), tagged by source where useful.
+- **Any Codex-only points you deliberately skipped** — call them out so the user can override if they disagree. (Codex didn't block readiness, but the user should see what it raised.)
 - CI status (`gh pr checks "$PR"`) and **merge status** (mergeable / behind / conflicting, per step 1b).
 - An explicit: "Ready for your review and merge" — and wait. Never run `gh pr merge`. (If conflicts remain unresolved because you're waiting on the user's OK, say so instead.)
 
