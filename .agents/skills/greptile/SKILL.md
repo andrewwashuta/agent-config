@@ -160,12 +160,13 @@ Do a single, **instantaneous** state read — you effectively already did it in 
 - **Still waiting, window not elapsed** → print one status line — `waiting on Greptile — Nm of <GIVE_UP>m elapsed` — and **end the pass**. The loop is your polling interval; do not block or background anything. For self-paced `/loop`, schedule the next check **~240–270s** out (keeps the prompt cache warm; ~4–5 checks inside a 20-min window). For interval `/loop`, just let the next tick fire.
 - **Window elapsed, no response** → go to step 5's give-up branch and stop the loop.
 
-**Standalone (`/greptile` with no `/loop`), only if you want to actively block and wait:**
-Run the poller, which sleeps/polls every 30s up to its ~9-min safety cap:
+**No `/loop` available (Codex, or a standalone `/greptile` pass), if you want to actively block and wait:**
+Run the poller, which sleeps/polls every 30s up to its ~9-min safety cap. It lives in this skill's `scripts/` dir — the skill is symlinked at both `~/.claude/skills/greptile` and `~/.codex/skills/greptile`, so use whichever exists:
 ```bash
-bash ~/.claude/skills/greptile/scripts/poll-greptile.sh "$REPO" "$PR" "<retag-iso8601>" [GIVE_UP_MINUTES]
+bash "$HOME/.claude/skills/greptile/scripts/poll-greptile.sh" "$REPO" "$PR" "<retag-iso8601>" [GIVE_UP_MINUTES]
+# (Codex: swap .claude for .codex)
 ```
-Exit `0` → responded, re-read state and continue. Exit `2` → give-up window elapsed, stop. Exit `1` → hit the safety cap before the window; just re-run it (or switch to `/loop`). Do **not** also set a `ScheduleWakeup` — the blocking call *is* the wait.
+Exit `0` → responded, re-read state and continue. Exit `2` → give-up window elapsed, stop. Exit `1` → hit the safety cap before the window; just re-run it (or wrap the whole pass in an external loop — see Continuous mode). Do **not** also set a `ScheduleWakeup` — the blocking call *is* the wait.
 
 ### 5. Done — recommend merge (or give up), do NOT merge
 
@@ -182,18 +183,23 @@ Either way, end the pass cleanly — under `/loop`, signal there's nothing left 
 
 ## Continuous mode
 
-To keep listening rather than doing a single pass, the user runs:
+The skill works in both **Claude Code** and **Codex** (symlinked into `~/.claude/skills` and `~/.codex/skills`). The single pass is identical in both — only the way you *keep* listening differs.
 
+**Claude Code** — use the built-in loop:
 ```
 /loop /greptile          # current branch's PR (creates it if needed), or
 /loop /greptile 123       # a specific PR
 ```
+Each tick re-runs the pass (instantaneous check per tick — see step 4).
 
-Each tick re-runs this pass. Because the pass is idempotent and the give-up window is derived from PR timestamps, it implements new feedback as it arrives, re-tags, and converges. End the loop when:
+**Codex** (no `/loop`) — either run a single `/greptile` pass that blocks on the poller, or wrap repeated passes in an external loop / cron:
+```bash
+while :; do codex exec "/greptile 123"; sleep 180; done
+```
+
+Either way it converges, because the pass is **idempotent** and the give-up window is **derived from PR timestamps** (not local state) — so it implements new feedback as it arrives, re-tags, and reaches the same end state whether ticks come from `/loop`, an external loop, or you re-running it by hand. Stop when:
 - Greptile is clear → reported "ready for merge", or
 - the give-up window elapsed with no Greptile response.
-
-In both cases tell the loop there's nothing left to do so it stops.
 
 ## Guardrails
 

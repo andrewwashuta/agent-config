@@ -6,30 +6,35 @@ Reads **two** reviewers: [Greptile](https://greptile.com) (primary — gates mer
 
 ## Install
 
-A skill is just a folder. Copy it into your Claude Code skills dir:
+A skill is just a folder. Copy it into your agent's skills dir — works in **Claude Code** and **Codex**:
 
 ```bash
-git clone https://github.com/andrewwashuta/agent-config /tmp/ac && \
-  cp -r /tmp/ac/.agents/skills/greptile ~/.claude/skills/greptile
+git clone https://github.com/andrewwashuta/agent-config /tmp/ac
+cp -r /tmp/ac/.agents/skills/greptile ~/.claude/skills/greptile   # Claude Code
+cp -r /tmp/ac/.agents/skills/greptile ~/.codex/skills/greptile    # Codex
 ```
 
-Then `/greptile` and `/loop /greptile` are available in Claude Code.
+Then `/greptile` is available in that agent.
 
 ## Update
 
-Re-run the same command — the `cp` overwrites your copy with the latest version.
+Re-run the relevant `cp` above — it overwrites your copy with the latest version.
 
 ## Requirements
 
 - `gh` (GitHub CLI) authenticated in whatever repo you run it in.
-- Greptile enabled on that repo.
+- Greptile enabled on that repo (Codex reviewer optional).
 
 ## Usage
 
 ```
-/loop /greptile        # from a feature branch: create the PR (if none) and tend its review continuously
-/loop /greptile 123    # tend an existing PR continuously
-/greptile              # single pass (create PR / one round of feedback), no continuous loop
+/greptile              # single pass: create the PR (if none) + one round of feedback
+/greptile 123          # single pass on a specific PR
 ```
 
-It's repo-agnostic — works in any repo where Greptile is enabled. See `SKILL.md` for the full behavior.
+**Keep tending continuously:**
+
+- Claude Code: `/loop /greptile` (or `/loop /greptile 123`)
+- Codex (no `/loop`): wrap repeated passes, e.g. `while :; do codex exec "/greptile 123"; sleep 180; done`
+
+The pass is idempotent and the give-up window is derived from the PR's own timestamps, so it converges the same way however the ticks are driven. Repo-agnostic — works in any repo where Greptile is enabled. See `SKILL.md` for full behavior.
