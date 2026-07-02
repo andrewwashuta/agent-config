@@ -1,0 +1,5 @@
+# os-june judgment
+
+- The fixed agent composer is a DOM child of `.agent-scroll`, so scroller-level states and behaviors chain to the chat behind it: global `:focus-within` scrollbar reveals painted the chat thumb while typing, and ProseMirror's `scrollIntoView` walked up and scrolled the conversation on Shift+Enter (fixed with a custom `handleScrollToSelection`). Check that containment before blaming scroll logic *(2026-07)*
+- "Shadows look washed out in dark mode" root cause: surfaces hard-coding light-tuned black shadows with no dark override (12% black is invisible on near-black). Grep app.css for `oklch(0% 0 none` in box-shadow before touching the tokens *(2026-07)*
+- Don't bake a hairline ring into the shared `--shadow-sm/md/lg` tokens — call sites compose them with `--shadow-inset` or 1px borders and would double-edge. For ring-instead-of-border surfaces (chat composer), keep a transparent 1px border for layout and compose the ring as a `--composer-ring`-style variable so shadow overrides and focus states recompose the stack *(2026-07)*
