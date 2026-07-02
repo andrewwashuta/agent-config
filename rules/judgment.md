@@ -5,7 +5,8 @@ Lessons distilled from past sessions by `/distill` — typically written by a st
 ## Global judgment
 
 - Before re-tagging Greptile, scan recent PR comments for an existing `@greptileai` request and reuse that timestamp/listener instead of posting a duplicate — Andrew may have already triggered review himself, and duplicate bot pings create noise. *(2026-07)*
-- For iOS Safari haptic ticks, do not rely on `navigator.vibrate`; use the switch-control path from `web-haptics`, keep its hidden input rendered (`opacity`/`clip` instead of `display: none`), pre-warm it on mount, and trigger it synchronously at the top of the user gesture — otherwise Safari drops the haptic or the first tap is silent. *(2026-07)*
+- iOS 27 WebKit plays the switch haptic ONLY for a trusted tap on a real `<input type="checkbox" switch>` — synthetic `.click()`s are silent, so web-haptics and every click-a-hidden-switch scheme (including the old re-hide patch) are dead; overlay a full-size opacity-0 native switch inside the control so the finger toggles it and the click bubbles to the host's onClick (reference impl: os-marketing-page `components/haptic-switch.tsx`; verified on-device via a disposable bisect page with one strategy per row — build one of those before theorizing about haptics). *(2026-07)*
+- When a codex-rescue job sits in "verifying" for many minutes, `ps` for its build/test process before waiting longer — codex can keep polling a process that already died silently; cancel the job and run the verification yourself (the applied edits are already in the working tree). *(2026-07)*
 - When Andrew tunes visual weight (shadows, borders, rings, tints), change ONE small dial per round and name the dial and its next steps in the reply — he converges through quick ±1-step iterations against reference screenshots, and a multi-dial change makes the feedback loop ambiguous. *(2026-07)*
 
 ## Per-project judgment
